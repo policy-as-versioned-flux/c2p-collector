@@ -1,0 +1,48 @@
+name: release
+
+# Ticket 04 (real-estate): builds and publishes this component's image to
+# the org's registry (GHCR) on every semver tag, digest-addressable --
+# fleet's CronJob pins the resulting digest, making the collector a
+# Renovate-maintainable governed dependency like everything else in this
+# design. Published publicly (user-confirmed 2026-07-16) -- same posture
+# as every other repo in this org; a KiND demo cluster has no
+# imagePullSecret to pull a private image with.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push, tagged with the release version
+        run: |
+          set -euo pipefail
+          IMG="ghcr.io/${{ github.repository }}"
+          docker build -t "$IMG:${GITHUB_REF_NAME}" .
+          docker push "$IMG:${GITHUB_REF_NAME}"
+          digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMG:${GITHUB_REF_NAME}")
+          echo "Published: $digest"
+          echo "$digest" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Make the package public
+        # GHCR packages don't reliably inherit the repo's public visibility
+        # at first publish -- assert it explicitly. A KiND demo cluster
+        # pulling this image has no imagePullSecret, so a private package
+        # would silently break every future run.
+        run: |
+          gh api --method PATCH \
+            "/orgs/${{ github.repository_owner }}/packages/container/${{ github.event.repository.name }}" \
+            -f visibility=public || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
