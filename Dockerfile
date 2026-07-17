@@ -11,7 +11,7 @@ WORKDIR /src
 RUN git clone --depth 1 --branch v2.0.0-rc.1 https://github.com/oscal-compass/compliance-to-policy-go.git .
 RUN go build -o /out/c2pcli ./cmd/c2pcli && go build -o /out/kyverno-plugin ./cmd/kyverno-plugin
 
-FROM alpine:3.20
+FROM alpine:3.24
 RUN apk add --no-cache jq curl ca-certificates
 ARG KUBECTL_VERSION=1.31.4
 RUN set -eu; \
