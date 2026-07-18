@@ -3,7 +3,7 @@
 # tradeoff) with a real, prebuilt, digest-addressable image -- the run time
 # cost (git clone + go build every 15 minutes, ~4 minutes observed) moves
 # from every run to this one build.
-FROM golang:1.24-alpine AS build
+FROM golang:1.26-alpine AS build
 RUN apk add --no-cache git
 WORKDIR /src
 # Pinned per ADR-0009's pre-GA acceptance -- same version the fleet
