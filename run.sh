@@ -43,10 +43,22 @@ echo "== collect PolicyReports from the live cluster, shim, run result2oscal =="
 # require-s3-bucket-encryption-2.2.0; the component-definition's Check_Id
 # is the unsuffixed base name) so one component-definition matches every
 # coexisting version.
+#
+# Drop `skip` results before they reach result2oscal (ticket 08 follow-up,
+# real-estate epic): a `skip` means the policy declined to evaluate the
+# resource at all (e.g. it lacks the labels a version-scoped rule expects)
+# -- it is not a compliance signal, and result2oscal only publishes one
+# finding per rule. Left in, an unrelated skipped resource can silently
+# win the slot over a real pass/fail claim from the team the rule is
+# actually about; observed live for require-rds-multi-az, where an
+# unrelated, unlabeled Crossplane fixture (issue 18's deliberately
+# unreconciled sample) outranked datastore's own genuine fail.
 kubectl get policyreports.wgpolicyk8s.io -A -o json \
-  | jq '.items |= map(.scope as $s | .results |= map(
-          .policy    = (.policy | sub("-[0-9]+\\.[0-9]+\\.[0-9]+$"; "")) |
-          .resources = [{apiVersion:$s.apiVersion, kind:$s.kind, namespace:$s.namespace, name:$s.name, uid:$s.uid}]))' \
+  | jq '.items |= (map(.scope as $s | .results |= (
+          map(select(.result != "skip")) | map(
+            .policy    = (.policy | sub("-[0-9]+\\.[0-9]+\\.[0-9]+$"; "")) |
+            .resources = [{apiVersion:$s.apiVersion, kind:$s.kind, namespace:$s.namespace, name:$s.name, uid:$s.uid}])
+          )) | map(select(.results | length > 0)))' \
   > reports/policyreports.wgpolicyk8s.io.yaml
 
 c2pcli result2oscal -c c2p-config.yaml -n nist_800_53 -o assessment-results.json -p plugins
