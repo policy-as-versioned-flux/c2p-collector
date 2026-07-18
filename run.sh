@@ -37,28 +37,10 @@ empty reports/clusterpolicies.kyverno.io.yaml
 empty reports/clusterpolicyreports.wgpolicyk8s.io.yaml
 
 echo "== collect PolicyReports from the live cluster, shim, run result2oscal =="
-# The shim (ADR-0009, proven in issue 20): scope -> results[].resources
-# (Kyverno >=1.18 per-resource reports), and strip the coexistence
-# nameSuffix (results[].policy comes back as e.g.
-# require-s3-bucket-encryption-2.2.0; the component-definition's Check_Id
-# is the unsuffixed base name) so one component-definition matches every
-# coexisting version.
-#
-# Drop `skip` results before they reach result2oscal (ticket 08 follow-up,
-# real-estate epic): a `skip` means the policy declined to evaluate the
-# resource at all (e.g. it lacks the labels a version-scoped rule expects)
-# -- it is not a compliance signal, and result2oscal only publishes one
-# finding per rule. Left in, an unrelated skipped resource can silently
-# win the slot over a real pass/fail claim from the team the rule is
-# actually about; observed live for require-rds-multi-az, where an
-# unrelated, unlabeled Crossplane fixture (issue 18's deliberately
-# unreconciled sample) outranked datastore's own genuine fail.
+# The shim transform lives in shim.jq (single source of truth -- see that file's own header for
+# what it does and why; run.sh and verify.sh both read it so they can't drift apart again).
 kubectl get policyreports.wgpolicyk8s.io -A -o json \
-  | jq '.items |= (map(.scope as $s | .results |= (
-          map(select(.result != "skip")) | map(
-            .policy    = (.policy | sub("-[0-9]+\\.[0-9]+\\.[0-9]+$"; "")) |
-            .resources = [{apiVersion:$s.apiVersion, kind:$s.kind, namespace:$s.namespace, name:$s.name, uid:$s.uid}])
-          )) | map(select(.results | length > 0)))' \
+  | jq -f "$(dirname "$0")/shim.jq" \
   > reports/policyreports.wgpolicyk8s.io.yaml
 
 c2pcli result2oscal -c c2p-config.yaml -n nist_800_53 -o assessment-results.json -p plugins

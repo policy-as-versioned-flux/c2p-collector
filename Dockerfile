@@ -23,6 +23,6 @@ RUN set -eu; \
     rm /tmp/kubectl.sha256
 COPY --from=build /out/c2pcli /usr/local/bin/c2pcli
 COPY --from=build /out/kyverno-plugin /usr/local/bin/kyverno-plugin
-COPY run.sh /usr/local/bin/run.sh
+COPY run.sh shim.jq /usr/local/bin/
 RUN chmod +x /usr/local/bin/run.sh
 ENTRYPOINT ["/usr/local/bin/run.sh"]
