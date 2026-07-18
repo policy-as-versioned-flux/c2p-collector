@@ -1,0 +1,19 @@
+name: verify
+
+# Wave-3 audit (2026-07-18, faithful-floor ticket 04 follow-up): verify.sh existed as a runnable
+# self-check but nothing ran it automatically -- it only caught drift if someone remembered to run
+# it by hand, and nobody did when run.sh's shim logic was fixed (ticket 08 follow-up, real-estate
+# epic). Gating it on every PR closes that gap the same way pr-gate.yml already does for fleet.
+
+on:
+  pull_request: {}
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./verify.sh
